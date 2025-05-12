@@ -20,7 +20,6 @@ def _():
     import hdbscan
     from scipy.spatial.distance import jensenshannon
     from scipy.spatial import distance_matrix
-
     return (
         distance_matrix,
         hdbscan,
@@ -81,6 +80,68 @@ def _(path_to_all_df_probabilities_rel, path_to_all_metrics, pd):
     all_df_probabilities_rel = pd.read_csv(path_to_all_df_probabilities_rel, index_col=0)
     all_metrics = pd.read_csv(path_to_all_metrics, index_col=0)
     return all_df_probabilities_rel, all_metrics
+
+
+@app.cell(hide_code=True)
+def _(MC_range, all_metrics, np, output_directory_path):
+    import xml.etree.ElementTree as ET
+    def calculate_mean_coherence(xml_file_path):
+        # Potential error sources and improvements
+        try:
+            # Parse the XML file
+            tree = ET.parse(xml_file_path)
+            root = tree.getroot()
+        
+            # Potential error sources:
+            # 1. Make sure the XML structure matches your expected path
+            # 2. Verify the 'coherence' attribute exists
+            coherence_scores = []
+        
+            # More robust way to extract coherence values
+            for topic in root.findall('.//topic'):
+                # Error might occur if:
+                # - 'coherence' attribute is missing
+                # - 'coherence' value cannot be converted to float
+                try:
+                    coherence_value = float(topic.get('coherence', 'NaN'))
+                    # Optional: Skip NaN or invalid values
+                    if not np.isnan(coherence_value):
+                        coherence_scores.append(coherence_value)
+                except (TypeError, ValueError) as e:
+                    print(f"Error processing topic: {e}")
+        
+            # Check if any valid scores were found
+            if not coherence_scores:
+                raise ValueError("No valid coherence scores found in the XML")
+        
+            return np.mean(coherence_scores)
+    
+        except ET.ParseError:
+            print("Error parsing XML file. Check the file format.")
+            return None
+        except FileNotFoundError:
+            print(f"File not found: {xml_file_path}")
+            return None
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            return None
+
+
+    mean_coherence=[]
+    for numbers in MC_range:
+        diagnosis_file_path=output_directory_path + f"/mallet.diagnostics.{numbers}.xml"
+        mean_value=calculate_mean_coherence(diagnosis_file_path)
+        mean_coherence.append(mean_value)
+    
+    all_metrics['Coherence']=mean_coherence
+    return (
+        ET,
+        calculate_mean_coherence,
+        diagnosis_file_path,
+        mean_coherence,
+        mean_value,
+        numbers,
+    )
 
 
 @app.cell
