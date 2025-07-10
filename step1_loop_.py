@@ -6,7 +6,6 @@ app = marimo.App(width="full")
 
 @app.cell
 def _():
-    import marimo as mo
     import warnings
     warnings.filterwarnings("ignore")
 
@@ -40,7 +39,6 @@ def _():
         gensim,
         lmw,
         mcolors,
-        mo,
         np,
         os,
         path_to_mallet,
@@ -52,6 +50,12 @@ def _():
         subprocess,
         warnings,
     )
+
+
+@app.cell
+def _():
+    # get a cut of table just 10, and remove sample ID, and Shuffle numbers
+    return
 
 
 @app.cell(hide_code=True)
@@ -247,11 +251,6 @@ def _(
         update_genus,
         update_genus_new,
     )
-
-
-@app.cell
-def _():
-    return
 
 
 @app.cell
