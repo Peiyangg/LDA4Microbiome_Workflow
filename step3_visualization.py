@@ -1,7 +1,7 @@
 import marimo
 
 __generated_with = "0.11.8"
-app = marimo.App(width="medium")
+app = marimo.App(width="full")
 
 
 @app.cell
@@ -863,10 +863,10 @@ def _(mo):
 
 @app.cell
 def _():
-    Number_of_Topic='7'
+    Number_of_Topic='3'
     Top_ASV_of_each_MC = 7
-    base_directory = '/Users/huopeiyang/Library/CloudStorage/OneDrive-KULeuven/py_working/LDA_workflow/Luke_test'
-    metadata_path = '/Users/huopeiyang/Library/CloudStorage/OneDrive-KULeuven/py_working/Luke_data/metadata_cleaned.csv'
+    base_directory          = 'example_test'
+    metadata_path = '/Users/huopeiyang/Library/CloudStorage/OneDrive-KULeuven/py_working/github/LDA4Microbiome/example/data/shuffled_metadata.csv'
     return Number_of_Topic, Top_ASV_of_each_MC, base_directory, metadata_path
 
 
@@ -900,29 +900,31 @@ def _(Number_of_Topic, base_directory, os):
     loop_directory = os.path.join(base_directory, 'lda_loop')
     inter_directory = os.path.join(base_directory, 'intermediate')
     viz_directory = os.path.join(base_directory, 'lda_visualization')
-    results_directory = os.path.join(base_directory, 'lda_results')
+    lda_directory = os.path.join(base_directory, 'lda_results')
+    MC_sample_directory    =   os.path.join(lda_directory, 'MC_Sample')
+    MC_feature_directory    =   os.path.join(lda_directory, 'MC_Feature')
     os.makedirs(viz_directory, exist_ok=True)
 
     output_directory_path = base_directory + '/lda_onenumber'
-    path_to_DirichletComponentProbabilities             = results_directory + f"/DirichletComponentProbabilities_{Number_of_Topic}.csv"
-    path_to_TaxaProbabilities                          = results_directory + f"/ASVProbabilities_{Number_of_Topic}.csv"
-    path_to_TaxaProbabilities_json                     = viz_directory + '/ASVProbability.json'
-    path_to_ASVProbabilities                           = results_directory + f"/ASVProbabilities_{Number_of_Topic}.csv"
+    path_to_DirichletComponentProbabilities            = MC_sample_directory + f"/MC_Sample_probabilities{Number_of_Topic}.csv"
+    path_to_TaxaProbabilities                          = lda_directory + f"/ASVProbabilities_{Number_of_Topic}.csv"
+    path_to_ASVProbabilities                           = MC_feature_directory + f"/MC_Feature_Probabilities_{Number_of_Topic}.csv"
     path_to_mc_taxa_heatmap                            = viz_directory + "/mc-taxa-heatmap.png"
     path_to_lda_diagnosis                              = loop_directory + f"/mallet.diagnostics.{Number_of_Topic}.xml"
-    path_to_new_taxa                                   = inter_directory + "/new_taxa.csv"
+    path_to_new_taxa                                   = inter_directory + "/intermediate_taxa.csv"
     return (
+        MC_feature_directory,
+        MC_sample_directory,
         inter_directory,
+        lda_directory,
         loop_directory,
         output_directory_path,
         path_to_ASVProbabilities,
         path_to_DirichletComponentProbabilities,
         path_to_TaxaProbabilities,
-        path_to_TaxaProbabilities_json,
         path_to_lda_diagnosis,
         path_to_mc_taxa_heatmap,
         path_to_new_taxa,
-        results_directory,
         viz_directory,
     )
 
@@ -934,22 +936,15 @@ def _(mo):
 
 
 @app.cell
-def _(
-    metadata_path,
-    path_to_DirichletComponentProbabilities,
-    path_to_TaxaProbabilities,
-    pd,
-):
-    noises=[]
-
+def _(metadata_path, path_to_DirichletComponentProbabilities, pd):
     DMP = pd.read_csv(
         path_to_DirichletComponentProbabilities, 
         index_col=0
-    ).drop(noises, errors='ignore') 
+    ).T
     DM_distributions = DMP.values.tolist()
-    TP = pd.read_csv(path_to_TaxaProbabilities, index_col=0)
+    # TP = pd.read_csv(path_to_TaxaProbabilities, index_col=0)
     metadata = pd.read_csv(metadata_path,index_col=0)
-    return DMP, DM_distributions, TP, metadata, noises
+    return DMP, DM_distributions, metadata
 
 
 @app.cell
@@ -997,43 +992,144 @@ def _(mo):
     return
 
 
-@app.cell
-def _(path_to_new_taxa, pd):
-    new_taxa=pd.read_csv(path_to_new_taxa, index_col=0)
-    new_taxa_dict = dict(zip(new_taxa['randomID'], new_taxa['genus_ID']))
-    return new_taxa, new_taxa_dict
+@app.cell(hide_code=True)
+def _():
+    # new_taxa=pd.read_csv(path_to_new_taxa, index_col=0)
+    # new_taxa_dict = dict(zip(new_taxa['randomID'], new_taxa['genus_ID']))
+    # MC_list=["MC"+str(a) for a in range(int(Number_of_Topic))]
+    # AP = pd.read_csv(path_to_ASVProbabilities, index_col=0)
+    # AP = AP.reset_index()
+    # AP = AP.drop(columns=['index'])
+    # AP.index = MC_list
+    # AP.columns = [new_taxa_dict.get(col, col) for col in AP.columns]
+    # top_tokens_df = AP.apply(get_top_tokens, axis=1)
+    return
+
+
+@app.cell(hide_code=True)
+def _(pd):
+    def data_processing_MC_feature(path_to_new_taxa, path_to_ASVProbabilities, Number_of_Topic, 
+                                   feature_level='genus_ID', get_top_tokens_func=None):
+        """
+        Process microbial component (MC) feature data by mapping ASV probabilities to taxonomic levels.
+    
+        Args:
+            path_to_new_taxa (str): Path to CSV file containing taxonomic information
+            path_to_ASVProbabilities (str): Path to CSV file containing ASV probabilities
+            Number_of_Topic (int): Number of topics/microbial components
+            feature_level (str): Column name for taxonomic level ('genus_ID', 'Genus', 'Family', etc.)
+            get_top_tokens_func (callable): Function to get top tokens, if None uses default
+    
+        Returns:
+            tuple: (processed_probabilities_df, top_tokens_df, mapping_dict)
+                - processed_probabilities_df: DataFrame with mapped and grouped probabilities
+                - top_tokens_df: DataFrame with top tokens for each MC (if function provided)
+                - mapping_dict: Dictionary showing the mapping used
+        """
+    
+        # Input validation
+        if not isinstance(Number_of_Topic, int) or Number_of_Topic < 1:
+            raise ValueError("Number_of_Topic must be a positive integer")
+    
+        # Default top tokens function if none provided
+        if get_top_tokens_func is None:
+            def get_top_tokens_func(row, top_n=10):
+                """Default function to get top tokens from a row"""
+                return row.nlargest(top_n)
+    
+        try:
+            # Read taxonomic data
+            print(f"Reading taxonomic data from: {path_to_new_taxa}")
+            new_taxa = pd.read_csv(path_to_new_taxa, index_col=0)
+        
+            # Validate that the specified genus_ID column exists
+            if feature_level not in new_taxa.columns:
+                available_cols = list(new_taxa.columns)
+                raise ValueError(f"Column '{feature_level}' not found in taxa file. Available columns: {available_cols}")
+        
+            # Create mapping dictionary
+            print(f"Creating mapping dictionary using column: {feature_level}")
+            new_taxa_dict = dict(zip(new_taxa['randomID'], new_taxa[feature_level]))
+        
+            # Create MC list
+            MC_list = ["MC" + str(a) for a in range(int(Number_of_Topic))]
+            print(f"Created {len(MC_list)} MC labels: {MC_list[:5]}..." if len(MC_list) > 5 else f"Created MC labels: {MC_list}")
+        
+            # Read ASV probabilities
+            print(f"Reading ASV probabilities from: {path_to_ASVProbabilities}")
+            AP = pd.read_csv(path_to_ASVProbabilities, index_col=0)
+        
+            # Reset index and clean up
+            AP = AP.reset_index()
+            AP = AP.drop(columns=['index'])
+            AP.index = MC_list
+        
+            print(f"Original ASV probabilities shape: {AP.shape}")
+        
+            # Map column names using the dictionary
+            print("Mapping ASV IDs to taxonomic names...")
+            original_columns = AP.columns.tolist()
+            AP.columns = [new_taxa_dict.get(col, col) for col in AP.columns]
+        
+            # Count how many columns were mapped
+            mapped_count = sum(1 for orig_col in original_columns if orig_col in new_taxa_dict)
+            print(f"Mapped {mapped_count}/{len(original_columns)} columns to taxonomic names")
+        
+            # Group by taxonomic level and sum probabilities
+            print(f"Grouping by {feature_level} and summing probabilities...")
+        
+            # Group columns with same taxonomic assignment
+            grouped_AP = AP.groupby(level=0, axis=1).sum()
+        
+            # Apply top tokens function if provided
+            top_tokens_df = None
+            if get_top_tokens_func is not None:
+                print("Calculating top tokens for each MC...")
+                try:
+                    top_tokens_df = grouped_AP.apply(get_top_tokens_func, axis=1)
+                    print(f"Top tokens calculated successfully. Shape: {top_tokens_df.shape}")
+                except Exception as e:
+                    print(f"Warning: Could not calculate top tokens - {str(e)}")
+                    top_tokens_df = None
+        
+            # Create summary statistics
+            print("\n=== PROCESSING SUMMARY ===")
+            print(f"Number of MCs: {len(MC_list)}")
+            print(f"Taxonomic level used: {feature_level}")
+        
+        
+            return grouped_AP, top_tokens_df
+        
+        except FileNotFoundError as e:
+            print(f"Error: File not found - {str(e)}")
+            raise
+        except pd.errors.EmptyDataError as e:
+            print(f"Error: Empty data file - {str(e)}")
+            raise
+        except Exception as e:
+            print(f"Error during processing: {str(e)}")
+            raise
+    return (data_processing_MC_feature,)
 
 
 @app.cell
-def _(Number_of_Topic, path_to_ASVProbabilities, pd):
-    MC_list=["MC"+str(a) for a in range(int(Number_of_Topic))]
-    AP = pd.read_csv(path_to_ASVProbabilities, index_col=0)
-    AP = AP.reset_index()
-    AP = AP.drop(columns=['index'])
-    AP.index = MC_list
-    return AP, MC_list
+def _(data_processing_MC_feature, path_to_ASVProbabilities, path_to_new_taxa):
+    feature_df, top_tokens_df = data_processing_MC_feature(
+        path_to_new_taxa=path_to_new_taxa,
+        path_to_ASVProbabilities=path_to_ASVProbabilities,
+        feature_level='Genus',
+        Number_of_Topic=3
+    )
+    return feature_df, top_tokens_df
 
 
 @app.cell
-def _(AP, get_top_tokens, new_taxa_dict):
-    AP.columns = [new_taxa_dict.get(col, col) for col in AP.columns]
-    top_tokens_df = AP.apply(get_top_tokens, axis=1)
-    return (top_tokens_df,)
-
-
-@app.cell
-def _(
-    create_clustered_heatmap_taxa,
-    path_to_mc_taxa_heatmap,
-    plt,
-    top_tokens_df,
-):
-    fig, ax = create_clustered_heatmap_taxa(
+def _(create_clustered_heatmap_taxa, path_to_mc_taxa_heatmap, top_tokens_df):
+    fig = create_clustered_heatmap_taxa(
         top_tokens_df, 
         output_path=path_to_mc_taxa_heatmap,
     )
-    plt.show()
-    return ax, fig
+    return (fig,)
 
 
 if __name__ == "__main__":

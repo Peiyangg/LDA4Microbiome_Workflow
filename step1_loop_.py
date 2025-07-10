@@ -163,24 +163,12 @@ def _(CoherenceModel, Dictionary, defaultdict, lmw, np):
 
 
 @app.cell
-def _(mo):
-    mo.md("""# Inputs:""")
-    return
-
-
-@app.cell
 def _():
     base_directory          = 'example_test'
     # model selection range
     MC_range = range(2, 5)
     range_str = f"{MC_range.start}_{MC_range.stop-1}"
     return MC_range, base_directory, range_str
-
-
-@app.cell
-def _(mo):
-    mo.md("""# RUN loop""")
-    return
 
 
 @app.cell
@@ -191,13 +179,14 @@ def _(base_directory, os):
     lda_directory           =   os.path.join(base_directory, 'lda_results')
     MC_sample_directory    =   os.path.join(lda_directory, 'MC_Sample')
     MC_feature_directory    =   os.path.join(lda_directory, 'MC_Feature')
+    MALLET_diagnostics_directory = os.path.join(lda_directory, 'Diagnostics')
 
     os.makedirs(intermediate_directory, exist_ok=True)
     os.makedirs(loop_directory, exist_ok=True)
     os.makedirs(lda_directory, exist_ok=True)
     os.makedirs(MC_sample_directory, exist_ok=True)
     os.makedirs(MC_feature_directory, exist_ok=True)
-
+    os.makedirs(MALLET_diagnostics_directory, exist_ok=True)
 
     # Now you can use lda_directory as your output path
     loop_output_directory_path = loop_directory
@@ -210,6 +199,7 @@ def _(base_directory, os):
     return (
         Loop_MC_feature_directory_directory_path,
         Loop_MC_sample_directory_path,
+        MALLET_diagnostics_directory,
         MC_feature_directory,
         MC_sample_directory,
         intermediate_directory,
@@ -234,6 +224,7 @@ def _(intermediate_directory, path_to_training_data, pd):
 def _(
     Loop_MC_feature_directory_directory_path,
     Loop_MC_sample_directory_path,
+    MALLET_diagnostics_directory,
     MC_range,
     calculate_coherence,
     calculate_perplexity,
@@ -262,7 +253,7 @@ def _(
         path_to_topic_keys = loop_output_directory_path + f'/mallet.topic_keys.{num_topics}'
         path_to_topic_distributions = loop_output_directory_path + f'/mallet.topic_distributions.{num_topics}'
         path_to_word_weights = loop_output_directory_path + f'/mallet.word_weights.{num_topics}'
-        path_to_diagnostics = loop_output_directory_path + f'/mallet.diagnostics.{num_topics}.xml'
+        path_to_diagnostics = MALLET_diagnostics_directory + f'/mallet.diagnostics.{num_topics}.xml'
 
         # Define paths for individual model results
         path_to_DirichletComponentProbabilities = Loop_MC_sample_directory_path + f'/MC_Sample_probabilities{num_topics}.csv'
