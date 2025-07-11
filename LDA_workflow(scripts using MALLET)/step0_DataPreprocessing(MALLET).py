@@ -222,11 +222,23 @@ def _(os, pd, random, string):
 
 @app.cell
 def _(TaxonomyProcessor):
+    processor = TaxonomyProcessor(
+            asvtable_path='example_data/data/sampled_data.csv',
+            taxonomy_path='example_data/data/shuffled_taxonomy.csv',
+            base_directory='example_test'
+        )
+
+    results = processor.process_all()
+    return processor, results
+
+
+@app.cell
+def _(TaxonomyProcessor):
     if __name__ == "__main__":
         # Initialize the processor
         processor = TaxonomyProcessor(
-            asvtable_path='example/data/sampled_data.csv',
-            taxonomy_path='example/data/shuffled_taxonomy.csv',
+            asvtable_path='example_data/data/sampled_data.csv',
+            taxonomy_path='example_data/data/shuffled_taxonomy.csv',
             base_directory='example_test'
         )
 
